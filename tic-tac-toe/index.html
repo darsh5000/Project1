@@ -1,0 +1,426 @@
+<title>Graph Paper Tic-Tac-Toe</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gochi+Hand&family=Figtree:wght@400;500;600&display=swap">
+<style>
+  :root {
+    --paper: #f7f9fb;
+    --grid: #dbe6ee;
+    --ink: #1c2a3a;
+    --muted: #5d6f80;
+    --x: #1f4fb8;       /* ballpoint blue */
+    --o: #c8372d;       /* red pencil */
+    --line: #1c2a3a;
+    --chip: #e8eff5;
+    --focus: #1f4fb8;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --paper: #0f1d33;
+      --grid: #1d3252;
+      --ink: #e4ecf6;
+      --muted: #93a6bf;
+      --x: #7fb2ff;
+      --o: #ff8a7a;
+      --line: #c9d6e6;
+      --chip: #172a47;
+      --focus: #7fb2ff;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --paper: #0f1d33;
+    --grid: #1d3252;
+    --ink: #e4ecf6;
+    --muted: #93a6bf;
+    --x: #7fb2ff;
+    --o: #ff8a7a;
+    --line: #c9d6e6;
+    --chip: #172a47;
+    --focus: #7fb2ff;
+  }
+
+  html, body { height: 100%; }
+  body {
+    background-color: var(--paper);
+    background-image:
+      linear-gradient(var(--grid) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+    background-size: 24px 24px;
+    color: var(--ink);
+    font-family: "Figtree", system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-size: 16px;
+    padding-inline: 16px;
+    padding-block: 32px;
+    box-sizing: border-box;
+  }
+  .wrap {
+    max-width: 440px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+  h1 {
+    font-family: "Gochi Hand", "Comic Sans MS", cursive;
+    font-weight: 400;
+    font-size: clamp(34px, 9vw, 46px);
+    line-height: 1;
+    margin: 0;
+    text-wrap: balance;
+  }
+  h1 .x { color: var(--x); }
+  h1 .o { color: var(--o); }
+  .sub { margin: 6px 0 0; color: var(--muted); font-size: 15px; }
+
+  /* Scoreboard with tally marks */
+  .score {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+  }
+  .tally {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 8px 10px;
+    background: var(--paper);
+    border: 1.5px solid var(--grid);
+    border-radius: 6px;
+  }
+  .tally .label {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .tally .count {
+    font-family: "Gochi Hand", cursive;
+    font-size: 26px;
+    line-height: 1.1;
+    font-variant-numeric: tabular-nums;
+  }
+  .tally.you .count { color: var(--x); }
+  .tally.cpu .count { color: var(--o); }
+
+  .status {
+    font-family: "Gochi Hand", cursive;
+    font-size: 26px;
+    min-height: 1.3em;
+    margin: 0;
+  }
+
+  /* Board */
+  .board-wrap { position: relative; width: 100%; max-width: 100%; aspect-ratio: 1; }
+  .board {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    grid-template-rows: repeat(3, 1fr);
+    width: 100%;
+    height: 100%;
+    background: var(--paper);
+  }
+  .cell {
+    appearance: none;
+    border: 0;
+    background: transparent;
+    padding: 0;
+    cursor: pointer;
+    position: relative;
+    color: inherit;
+  }
+  .cell:nth-child(-n+6) { border-bottom: 3px solid var(--line); }
+  .cell:not(:nth-child(3n)) { border-right: 3px solid var(--line); }
+  .cell:disabled { cursor: default; }
+  .cell:focus-visible { outline: 3px solid var(--focus); outline-offset: -8px; border-radius: 6px; }
+  .cell:not(:disabled):hover::after {
+    content: "×";
+    position: absolute; inset: 0;
+    display: grid; place-items: center;
+    font-size: 64px;
+    color: var(--x);
+    opacity: 0.18;
+    font-family: "Gochi Hand", cursive;
+  }
+  .cell svg { width: 70%; height: 70%; display: block; margin: auto; overflow: visible; }
+  .cell svg path, .cell svg circle {
+    fill: none;
+    stroke-width: 9;
+    stroke-linecap: round;
+    stroke-dasharray: 300;
+    stroke-dashoffset: 300;
+    animation: draw 0.35s ease-out forwards;
+  }
+  .cell svg.mx path { stroke: var(--x); }
+  .cell svg.mx path:nth-child(2) { animation-delay: 0.15s; }
+  .cell svg.mo circle { stroke: var(--o); }
+  .cell.win svg { filter: drop-shadow(0 0 0 transparent); }
+  .cell.dim svg { opacity: 0.3; transition: opacity 0.3s; }
+  @keyframes draw { to { stroke-dashoffset: 0; } }
+
+  .strike {
+    position: absolute; inset: 0;
+    width: 100%; height: 100%;
+    pointer-events: none;
+    overflow: visible;
+  }
+  .strike line {
+    stroke: var(--ink);
+    stroke-width: 1.6;
+    stroke-linecap: round;
+    stroke-dasharray: 150;
+    stroke-dashoffset: 150;
+    animation: draw 0.4s ease-out 0.2s forwards;
+  }
+
+  /* Controls */
+  .controls { display: flex; flex-direction: column; gap: 12px; }
+  .row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+  .row .label {
+    font-size: 11px; font-weight: 600; letter-spacing: 0.08em;
+    text-transform: uppercase; color: var(--muted); min-width: 84px;
+  }
+  .seg { display: inline-flex; background: var(--chip); border-radius: 999px; padding: 3px; gap: 2px; }
+  .seg input { position: absolute; opacity: 0; pointer-events: none; }
+  .seg label {
+    padding: 6px 14px; border-radius: 999px; cursor: pointer;
+    font-size: 14px; font-weight: 500; color: var(--muted);
+  }
+  .seg input:checked + label { background: var(--ink); color: var(--paper); }
+  .seg input:focus-visible + label { outline: 2px solid var(--focus); outline-offset: 2px; }
+  .btn {
+    align-self: flex-start;
+    font: inherit; font-weight: 600; font-size: 15px;
+    padding: 10px 20px;
+    border: 2px solid var(--ink);
+    border-radius: 999px;
+    background: transparent;
+    color: var(--ink);
+    cursor: pointer;
+  }
+  .btn:hover { background: var(--ink); color: var(--paper); }
+  .btn:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+  .note { color: var(--muted); font-size: 13px; margin: 0; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .cell svg path, .cell svg circle, .strike line { animation: none; stroke-dashoffset: 0; }
+  }
+</style>
+
+<main class="wrap">
+  <header>
+    <h1><span class="x">Tic</span>-Tac-<span class="o">Toe</span></h1>
+    <p class="sub">You play <strong style="color:var(--x)">X</strong>. The computer plays <strong style="color:var(--o)">O</strong>. Get three in a row.</p>
+  </header>
+
+  <section class="score" aria-label="Score">
+    <div class="tally you"><span class="label">You</span><span class="count" id="s-you">0</span></div>
+    <div class="tally"><span class="label">Cat's game</span><span class="count" id="s-draw">0</span></div>
+    <div class="tally cpu"><span class="label">Computer</span><span class="count" id="s-cpu">0</span></div>
+  </section>
+
+  <p class="status" id="status" role="status" aria-live="polite">Your move</p>
+
+  <div class="board-wrap">
+    <div class="board" id="board" role="grid" aria-label="Tic-tac-toe board"></div>
+    <svg class="strike" id="strike" viewBox="0 0 30 30" aria-hidden="true"></svg>
+  </div>
+
+  <section class="controls">
+    <div class="row">
+      <span class="label">Computer</span>
+      <div class="seg" role="radiogroup" aria-label="Difficulty">
+        <input type="radio" name="level" id="lv-easy" value="easy"><label for="lv-easy">Easy</label>
+        <input type="radio" name="level" id="lv-hard" value="hard" checked><label for="lv-hard">Unbeatable</label>
+      </div>
+    </div>
+    <div class="row">
+      <span class="label">First move</span>
+      <div class="seg" role="radiogroup" aria-label="Who goes first">
+        <input type="radio" name="first" id="fs-you" value="you" checked><label for="fs-you">You</label>
+        <input type="radio" name="first" id="fs-cpu" value="cpu"><label for="fs-cpu">Computer</label>
+      </div>
+    </div>
+    <button class="btn" id="reset" type="button">New game</button>
+    <p class="note">On Unbeatable, the computer checks every possible future move (the minimax algorithm). The best you can do is a draw, which is called a cat's game.</p>
+  </section>
+</main>
+
+<script>
+(() => {
+  const HUMAN = "X", CPU = "O";
+  const LINES = [
+    [0,1,2],[3,4,5],[6,7,8],   // rows
+    [0,3,6],[1,4,7],[2,5,8],   // columns
+    [0,4,8],[2,4,6]            // diagonals
+  ];
+
+  const boardEl = document.getElementById("board");
+  const statusEl = document.getElementById("status");
+  const strikeEl = document.getElementById("strike");
+  const scoreEls = {
+    you: document.getElementById("s-you"),
+    draw: document.getElementById("s-draw"),
+    cpu: document.getElementById("s-cpu"),
+  };
+
+  let board, over, busy;
+  let score = { you: 0, draw: 0, cpu: 0 };
+  try {
+    const saved = JSON.parse(localStorage.getItem("ttt-score"));
+    if (saved) score = Object.assign(score, saved);
+  } catch (e) {}
+
+  const level = () => document.querySelector('input[name="level"]:checked').value;
+  const firstMover = () => document.querySelector('input[name="first"]:checked').value;
+
+  // Build the 9 cells once.
+  const cells = [];
+  for (let i = 0; i < 9; i++) {
+    const b = document.createElement("button");
+    b.className = "cell";
+    b.type = "button";
+    b.id = "cell-" + i;
+    b.setAttribute("aria-label", "Row " + (Math.floor(i / 3) + 1) + ", column " + (i % 3 + 1) + ", empty");
+    b.addEventListener("click", () => humanMove(i));
+    boardEl.appendChild(b);
+    cells.push(b);
+  }
+
+  function winnerOf(b) {
+    for (const line of LINES) {
+      const [a, c, d] = line;
+      if (b[a] && b[a] === b[c] && b[a] === b[d]) return { player: b[a], line };
+    }
+    return b.every(Boolean) ? { player: null } : null;
+  }
+
+  // Minimax: score every possible game from here to the end.
+  // +10 means the computer wins, -10 means you win, 0 is a draw.
+  // Subtracting depth makes the computer prefer faster wins and slower losses.
+  function minimax(b, isCpuTurn, depth) {
+    const result = winnerOf(b);
+    if (result) {
+      if (result.player === CPU) return 10 - depth;
+      if (result.player === HUMAN) return depth - 10;
+      return 0;
+    }
+    let best = isCpuTurn ? -Infinity : Infinity;
+    for (let i = 0; i < 9; i++) {
+      if (b[i]) continue;
+      b[i] = isCpuTurn ? CPU : HUMAN;
+      const s = minimax(b, !isCpuTurn, depth + 1);
+      b[i] = null;
+      best = isCpuTurn ? Math.max(best, s) : Math.min(best, s);
+    }
+    return best;
+  }
+
+  function bestMove(b) {
+    const empty = b.map((v, i) => v ? null : i).filter(i => i !== null);
+    // Easy mode: play a random square most of the time.
+    if (level() === "easy" && Math.random() < 0.7) {
+      return empty[Math.floor(Math.random() * empty.length)];
+    }
+    let bestScore = -Infinity, choices = [];
+    for (const i of empty) {
+      b[i] = CPU;
+      const s = minimax(b, false, 1);
+      b[i] = null;
+      if (s > bestScore) { bestScore = s; choices = [i]; }
+      else if (s === bestScore) choices.push(i);
+    }
+    // Pick randomly among equally good moves so games vary.
+    return choices[Math.floor(Math.random() * choices.length)];
+  }
+
+  function markSvg(p) {
+    return p === HUMAN
+      ? '<svg class="mx" viewBox="0 0 100 100" aria-hidden="true"><path d="M18 18 L82 82"/><path d="M82 18 L18 82"/></svg>'
+      : '<svg class="mo" viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="34" transform="rotate(-90 50 50)"/></svg>';
+  }
+
+  function place(i, p) {
+    board[i] = p;
+    const c = cells[i];
+    c.innerHTML = markSvg(p);
+    c.disabled = true;
+    c.setAttribute("aria-label", c.getAttribute("aria-label").replace("empty", p === HUMAN ? "X" : "O"));
+  }
+
+  function checkEnd() {
+    const r = winnerOf(board);
+    if (!r) return false;
+    over = true;
+    cells.forEach(c => c.disabled = true);
+    if (r.player === HUMAN) { score.you++; statusEl.textContent = "You win! Nice."; }
+    else if (r.player === CPU) { score.cpu++; statusEl.textContent = "The computer wins."; }
+    else { score.draw++; statusEl.textContent = "Cat's game. It's a draw."; }
+    if (r.line) {
+      cells.forEach((c, i) => { if (!r.line.includes(i)) c.classList.add("dim"); });
+      drawStrike(r.line);
+    }
+    renderScore();
+    try { localStorage.setItem("ttt-score", JSON.stringify(score)); } catch (e) {}
+    return true;
+  }
+
+  function drawStrike(line) {
+    const center = i => [ (i % 3) * 10 + 5, Math.floor(i / 3) * 10 + 5 ];
+    const [x1, y1] = center(line[0]);
+    const [x2, y2] = center(line[2]);
+    // Extend the line a little past the end squares.
+    const dx = (x2 - x1) * 0.18, dy = (y2 - y1) * 0.18;
+    strikeEl.innerHTML = `<line x1="${x1 - dx}" y1="${y1 - dy}" x2="${x2 + dx}" y2="${y2 + dy}"/>`;
+  }
+
+  function renderScore() {
+    scoreEls.you.textContent = score.you;
+    scoreEls.draw.textContent = score.draw;
+    scoreEls.cpu.textContent = score.cpu;
+  }
+
+  function humanMove(i) {
+    if (over || busy || board[i]) return;
+    place(i, HUMAN);
+    if (checkEnd()) return;
+    cpuTurn();
+  }
+
+  function cpuTurn() {
+    busy = true;
+    statusEl.textContent = "Computer is thinking…";
+    cells.forEach(c => { if (!c.innerHTML) c.disabled = true; });
+    setTimeout(() => {
+      place(bestMove(board), CPU);
+      busy = false;
+      if (checkEnd()) return;
+      cells.forEach((c, i) => { if (!board[i]) c.disabled = false; });
+      statusEl.textContent = "Your move";
+    }, 450);
+  }
+
+  function newGame() {
+    board = Array(9).fill(null);
+    over = false;
+    busy = false;
+    strikeEl.innerHTML = "";
+    cells.forEach((c, i) => {
+      c.innerHTML = "";
+      c.disabled = false;
+      c.className = "cell";
+      c.setAttribute("aria-label", "Row " + (Math.floor(i / 3) + 1) + ", column " + (i % 3 + 1) + ", empty");
+    });
+    statusEl.textContent = "Your move";
+    if (firstMover() === "cpu") cpuTurn();
+  }
+
+  document.getElementById("reset").addEventListener("click", newGame);
+  document.querySelectorAll('input[name="first"]').forEach(r => r.addEventListener("change", newGame));
+
+  renderScore();
+  newGame();
+})();
+</script>
